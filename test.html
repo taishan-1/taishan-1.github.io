@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台山1号在线监测系统 - 实时监控平台</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="text/javascript" src="//api.map.baidu.com/api?type=webgl&v=1.0&ak=Bpj83OCYEI2X2STfO7vX90U8doi3dcJX"></script>
+    <style>
+        html, body, #video-page, .page-container {
+            height: 100%; 
+        }
+        .header {
+            background: linear-gradient(135deg, #f2f2f2, #0d71d5);
+            color: #0d71d5;
+            padding: 15px 100px;
+            display: flex;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        
+        .logo {
+            height: 150px;
+            margin-right: 20px;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.3));
+            transition: transform 0.3s ease;
+        }
+        
+        .logo:hover {
+            transform: scale(1.05);
+        }
+        
+        .title-container {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .title {
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            margin: 0;
+        }
+        .title-icon {
+            vertical-align: -5px;  /* 向下移动 10px */
+            }
+        .subtitle {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+        
+        
+        .page-container {
+            height: 100%;
+            max-width: 2000px; /* 与 .video-container 一致 */
+            margin: 0 auto; /* 居中 */
+            padding: 20px; /* 内边距 */
+            position: relative; /* 用于定位背景层 */
+            min-height: 100vh; /* 确保高度足够 */
+        }
+        .page-container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: url('logo.svg');
+            background-size: cover;
+            background-position: center;
+            opacity: 0.1;
+            z-index: -1;
+        }
+
+        
+        .video-env-container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            max-width: 1800px;
+            margin: 30px auto;
+            align-items: flex-start; /* 确保顶部对齐 */
+        }
+    
+        .video-container {
+            flex: 3;
+            position: relative;
+            padding-bottom: 56.25%; /*16:9 */
+            height: 0; /* 高度由padding控制 */
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-color: #f9f9f9;
+            margin-top: 45px; /* 添加与标题对齐的上边距 */
+        }
+
+        /* 修改后的环境数据容器样式 */
+        .env-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 280px;
+            margin-top: 45px; /* 添加与标题对齐的上边距 */
+        }
+        
+
+        .video-title, .content-header, .map-title {
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+
+
+        .envcontent {
+            width: 100%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-color: #f9f9f9;
+        }
+        
+        /* 修改后的地图容器样式 */
+        .map-container {
+            width: 100%;
+            height: 320px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        #baidu-map {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .map-title {
+            color: #0d71d5;
+            font-size: 25px;
+            margin-bottom: 5px;
+            padding-bottom: 1px;
+            border-bottom: 3px solid #0d71d5;
+        }
+        
+        .video-controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            align-items: center;
+        }    
+
+        .video-switcher {
+            display: flex;
+            gap: 10px;
+        }
+
+        .video-switcher button {
+            padding: 8px 15px;
+            background-color: #0d71d5;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .video-switcher button:hover {
+            background-color: #0b5cb8;
+        }
+        
+        .video-switcher button.active {
+            background-color: #094b9a;
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 5px;
+        }
+
+        .refresh-btn, .fullscreen-btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .refresh-btn {
+            background-color: #ffc107;
+            color: #212529;
+        }
+
+        .fullscreen-btn {
+            background-color: #28a745;
+            color: white;
+        }
+        
+        .video-player {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border: none;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .video-player.active {
+            display: block;
+        }
+
+        .video-title {
+            color: #0d71d5;
+            font-size: 25px;
+            margin-bottom: 15px;
+            padding-bottom: 1px;
+            border-bottom: 3px solid #0d71d5;
+        }
+
+        /* 日期时间 */
+        .datetime-container {
+            position: absolute;
+            right: 100px;
+            top: 100px;
+            transform: translateY(-50%);
+            background-color: rgba(255, 255, 255, 0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .date {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+        
+        .time {
+            font-size: 22px;
+            font-weight: bold;
+            color: #0d71d5;
+        }
+
+        
+        h2 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .content-header {
+            color: #0d71d5;
+            font-size: 25px;
+            margin-bottom: 15px;
+            padding-bottom: 1px;
+            border-bottom: 3px solid #0d71d5;
+        }
+        .oneserson {
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            padding: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .oneserson:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        
+        .centerdiv {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sersontext {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .sersonname {
+            font-weight: bold;
+            font-size: 16px;
+            margin: 0;
+        }
+        
+        .sersonunit {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin: 0;
+        }
+        
+        .totalframe {
+            height: 8px;
+            background-color: #ecf0f1;
+            border-radius: 4px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+        
+        .numframe {
+            height: 100%;
+            background-color: #2ecc71; /* 默认绿色 */
+            border-radius: 4px;
+            transition: all 0.5s ease;
+        }
+        
+        .sersonnum {
+            font-size: 18px;
+            font-weight: bold;
+            margin: 5px 0 0 0;
+            color: #2c3e50;
+        }
+        
+        .sersonnum[style*="display: none"] {
+            display: none !important;
+        }
+        
+        /* 警告状态颜色 */
+        .warning-high {
+            background-color: #e74c3c !important; /* 红色表示过高 */
+        }
+        
+        .warning-low {
+            background-color: #f39c12 !important; /* 橙色表示过低 */
+        }
+
+
+        .weather-module {
+            margin-top: 20px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            padding: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .weather-title {
+            color: #0d71d5;
+            font-size: 25px;
+            margin-bottom: 15px;
+            padding-bottom: 1px;
+            border-bottom: 3px solid #0d71d5;
+        }
+
+        .weather-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .weather-icon {
+            font-size: 40px;
+            color: #4682B4;
+            width: 50px;
+            text-align: center;
+        }
+
+        .weather-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .temperature {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .condition {
+            font-size: 16px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部标题栏 -->
+    <div class="header">
+        <img src="logo.svg" alt="中心Logo" class="logo">
+        <div class="title-container">
+            <h1 class="title">
+                台山1号在线监测系统
+                <img class="title-icon" src="Radio.svg" alt="监控图标" width="32" height="32">
+            </h1>
+            <div class="subtitle">中山大学—台山海洋发展优势种业与智慧养殖联合研发中心</div>
+        </div>
+        <!-- 新增日期时间显示 -->
+        <div class="datetime-container">
+            <div class="date" id="current-date"></div>
+            <div class="time" id="current-time"></div>
+        </div>
+    </div>
+    
+ 
+    <!-- 页面内容容器 -->
+    <div class="page-container">
+        <!-- 视频监控页面 -->
+        <div id="video-page" class="page active">
+            <div class="video-env-container">
+                <div class="video-container">
+                    <h2 class="video-title">视频监测</h2>
+                    <div class="video-controls">
+                        <div class="video-switcher">
+                            <button class="video-btn active" data-video="video1">台山一号1-1</button>
+                            <button class="video-btn" data-video="video2">台山一号1-2</button>
+                            <button class="video-btn" data-video="video3">台山一号2-1</button>
+                            <button class="video-btn" data-video="video4">台山一号2-2</button>
+                        </div>
+                        <div class="button-container">
+                            <button class="refresh-btn"><i class="fas fa-sync-alt"></i></button>
+                            <button class="fullscreen-btn"><i class="fas fa-expand"></i></button>   
+                        </div>
+                    </div>
+                    <iframe id="video1" class="video-player active" src="https://open.ys7.com/ezopen/h5/iframe?bSupporDoubleClickFull=0&amp;url=ezopen://open.ys7.com/FF3381768/1.hd.live&amp;autoplay=1&amp;audio=1&amp;accessToken=at.5usttoau8vv4b6ry1scriuds01eo6cs6-7axdyanr65-0ja6coj-emgstqxwt&amp;templete=0&amp;id=videovessel" allowfullscreen></iframe>
+                    <iframe id="video2" class="video-player" src="https://open.ys7.com/ezopen/h5/iframe?bSupporDoubleClickFull=0&amp;url=ezopen://open.ys7.com/FF3381768/2.hd.live&amp;autoplay=1&amp;audio=1&amp;accessToken=at.5usttoau8vv4b6ry1scriuds01eo6cs6-7axdyanr65-0ja6coj-emgstqxwt&amp;templete=0&amp;id=videovessel" allowfullscreen></iframe>
+                    <iframe id="video3" class="video-player" src="https://open.ys7.com/ezopen/h5/iframe?bSupporDoubleClickFull=0&url=ezopen://open.ys7.com/FF0961926/1.hd.live&autoplay=1&audio=1&accessToken=at.5usttoau8vv4b6ry1scriuds01eo6cs6-7axdyanr65-0ja6coj-emgstqxwt&templete=0&id=videovessel1" allowfullscreen></iframe>
+                    <iframe id="video4" class="video-player" src="https://open.ys7.com/ezopen/h5/iframe?bSupporDoubleClickFull=0&url=ezopen://open.ys7.com/FF0961926/2.hd.live&autoplay=1&audio=1&accessToken=at.5usttoau8vv4b6ry1scriuds01eo6cs6-7axdyanr65-0ja6coj-emgstqxwt&templete=0&id=videovessel2" allowfullscreen></iframe>
+                </div>
+
+                <!-- 修改后的环境数据和地图容器 -->
+                <div class="env-container">
+                    <div class="envcontent">
+                        <h2 class="content-header">环境数据监测</h2>
+                        <div class="oneserson">
+                            <div class="centerdiv">
+                                <div class="sersontext">
+                                    <p class="sersonname">水温</p>
+                                    <p class="sersonunit">(℃)</p>
+                                </div>
+                                <div class="totalframe">
+                                    <div class="numframe" style="width: 65%;"></div>
+                                </div>
+                                <p class="sersonnum">25.0</p>
+                                <p class="sersonnum" style="display: none;"></p>
+                                <p class="sersonnum" style="display: none;">0.00</p>
+                            </div>
+                        </div>
+                        
+                        <div class="oneserson">
+                            <div class="centerdiv">
+                                <div class="sersontext">
+                                    <p class="sersonname">pH</p>
+                                    <p class="sersonunit"></p>
+                                </div>
+                                <div class="totalframe">
+                                    <div class="numframe" style="width: 70%;"></div>
+                                </div>
+                                <p class="sersonnum">7.5</p>
+                                <p class="sersonnum" style="display: none;"></p>
+                                <p class="sersonnum" style="display: none;">0.00</p>
+                            </div>
+                        </div>
+                        
+                        <div class="oneserson">
+                            <div class="centerdiv">
+                                <div class="sersontext">
+                                    <p class="sersonname">溶解氧</p>
+                                    <p class="sersonunit">(mg/L)</p>
+                                </div>
+                                <div class="totalframe">
+                                    <div class="numframe" style="width: 60%;"></div>
+                                </div>
+                                <p class="sersonnum">8.2</p>
+                                <p class="sersonnum" style="display: none;"></p>
+                                <p class="sersonnum" style="display: none;">0.00</p>
+                            </div>
+                        </div>
+                        
+                        <div class="oneserson">
+                            <div class="centerdiv">
+                                <div class="sersontext">
+                                    <p class="sersonname">电导率</p>
+                                    <p class="sersonunit">(S/m)</p>
+                                </div>
+                                <div class="totalframe">
+                                    <div class="numframe" style="width: 55%;"></div>
+                                </div>
+                                <p class="sersonnum">0.18</p>
+                                <p class="sersonnum" style="display: none;"></p>
+                                <p class="sersonnum" style="display: none;">0.00</p>
+                            </div>
+                        </div>
+                        
+                        <div class="oneserson">
+                            <div class="centerdiv">
+                                <div class="sersontext">
+                                    <p class="sersonname">盐度</p>
+                                    <p class="sersonunit">(‰)</p>
+                                </div>
+                                <div class="totalframe">
+                                    <div class="numframe" style="width: 50%;"></div>
+                                </div>
+                                <p class="sersonnum">1.2</p>
+                                <p class="sersonnum" style="display: none;"></p>
+                                <p class="sersonnum" style="display: none;">0.00</p>
+                            </div>
+                        </div>
+
+                        <div class="oneserson">
+                            <div class="centerdiv">
+                                <div class="sersontext">
+                                    <p class="sersonname">气压</p>
+                                    <p class="sersonunit">(hPa)</p>
+                                </div>
+                                <div class="totalframe">
+                                    <div class="numframe" style="width: 50%;"></div>
+                                </div>
+                                <p class="sersonnum">1009.5</p>
+                                <p class="sersonnum" style="display: none;"></p>
+                                <p class="sersonnum" style="display: none;">0.00</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 地图现在位于环境数据下方 -->
+                    <div class="map-container">
+                        <h2 class="map-title">定位</h2>
+                        <div id="baidu-map"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 原有视频切换功能保持不变
+        const videoButtons = document.querySelectorAll('.video-btn');
+        const videoPlayers = document.querySelectorAll('.video-player');
+        
+        videoButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // 移除所有按钮和播放器的active类
+                videoButtons.forEach(btn => btn.classList.remove('active'));
+                videoPlayers.forEach(player => player.classList.remove('active'));
+                
+                // 为当前按钮和对应的播放器添加active类
+                button.classList.add('active');
+                const videoId = button.getAttribute('data-video');
+                document.getElementById(videoId).classList.add('active');
+            });
+        });
+        
+        // 全屏功能
+        const fullscreenBtn = document.querySelector('.fullscreen-btn');
+        fullscreenBtn.addEventListener('click', () => {
+            const activePlayer = document.querySelector('.video-player.active');
+            
+            if (activePlayer.requestFullscreen) {
+                activePlayer.requestFullscreen();
+            } else if (activePlayer.webkitRequestFullscreen) {
+                activePlayer.webkitRequestFullscreen();
+            } else if (activePlayer.msRequestFullscreen) {
+                activePlayer.msRequestFullscreen();
+            }
+        });
+        
+        const refreshBtn = document.querySelector('.refresh-btn');
+        refreshBtn.addEventListener('click', () => {
+            const activePlayer = document.querySelector('.video-player.active');
+            const currentSrc = activePlayer.src;
+            
+            // 通过重新设置src来刷新视频
+            activePlayer.src = '';
+            setTimeout(() => {
+                activePlayer.src = currentSrc;
+            }, 100);
+        });
+        // 新增日期时间功能
+        function updateDateTime() {
+            const now = new Date();
+            
+            // 格式化日期
+            const year = now.getFullYear();
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
+            const weekday = weekdays[now.getDay()];
+            
+            // 格式化时间
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            
+            // 更新显示
+            document.getElementById('current-date').textContent = `${year}年${month}月${day}日 ${weekday}`;
+            document.getElementById('current-time').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        
+        // 初始更新
+        updateDateTime();
+        
+        // 每秒更新一次时间
+        setInterval(updateDateTime, 1000);
+
+        // 传感器配置：正常范围、初始值和波动范围
+        const sensorConfigs = [
+            { 
+                name: '水温', 
+                normalRange: { min: 25, max: 28 }, // 正常范围
+                currentValue: 26.67,               // 初始值
+                fluctuation: 0.5,                 // 最大波动幅度
+                unit: '℃',
+                decimal: 2
+            },
+            { 
+                name: 'pH', 
+                normalRange: { min: 7.5, max: 8.9 },
+                currentValue: 8.5,
+                fluctuation: 0.2,
+                unit: '',
+                decimal: 2
+            },
+            { 
+                name: '溶解氧', 
+                normalRange: { min: 6, max: 10 },
+                currentValue: 8.2,
+                fluctuation: 0.3,
+                unit: 'mg/L',
+                decimal: 2
+            },
+            { 
+                name: '电导率', 
+                normalRange: { min: 3.0, max: 4.5 },
+                currentValue: 3.3,
+                fluctuation: 0.02,
+                unit: 'S/m',
+                decimal: 2
+            },
+            { 
+                name: '盐度', 
+                normalRange: { min: 20, max: 35 },
+                currentValue: 32,
+                fluctuation: 0.2,
+                unit: '‰',
+                decimal: 2
+            },
+            { 
+                name: '气压', 
+                normalRange: { min: 1000, max: 1010 },
+                currentValue: 1009.6,
+                fluctuation: 0.2,
+                unit: 'hPa',
+                decimal: 2
+            }
+        ];
+
+        // 更新传感器数据（保持正常范围内小幅波动）
+        function updateSensorData() {
+            document.querySelectorAll('.oneserson').forEach((sensor, index) => {
+                if(index < sensorConfigs.length) {
+                    const config = sensorConfigs[index];
+                    
+                    // 在正常值附近生成小幅波动 (-fluctuation 到 +fluctuation)
+                    const fluctuation = (Math.random() * 0.6 - 0.3) * config.fluctuation;
+                    config.currentValue = Math.min(
+                        Math.max(
+                            config.currentValue + fluctuation,
+                            config.normalRange.min
+                        ),
+                        config.normalRange.max
+                    );
+                    
+                    const value = config.currentValue.toFixed(config.decimal);
+                    // 计算进度条百分比 (相对于正常范围)
+                    const percentage = (
+                        (config.currentValue - config.normalRange.min) / 
+                        (config.normalRange.max - config.normalRange.min) * 100
+                    ).toFixed(2);
+                    
+                    // 更新显示的值
+                    const numElement = sensor.querySelector('.sersonnum:not([style*="display: none"])') || 
+                                      sensor.querySelector('.sersonnum');
+                    numElement.textContent = value;
+                    
+                    // 更新单位显示
+                    const unitElement = sensor.querySelector('.sersonunit');
+                    if(config.unit && !unitElement.textContent) {
+                        unitElement.textContent = `(${config.unit})`;
+                    }
+                    
+                    // 更新进度条
+                    const frame = sensor.querySelector('.numframe');
+                    frame.style.width = `${percentage}%`;
+                    
+                    // 重置颜色状态
+                    frame.classList.remove('warning-high', 'warning-low');
+                    
+                    // 只有在接近极限值时才显示警告色（5%缓冲区域）
+                    if(config.currentValue > config.normalRange.max * 1) {
+                        frame.classList.add('warning-high');
+                    } else if(config.currentValue < config.normalRange.min * 1) {
+                        frame.classList.add('warning-low');
+                    }
+                }
+            });
+        }
+        
+        // 每5秒更新一次数据
+        setInterval(updateSensorData, 5000);
+        
+        // 初始加载时立即更新
+        updateSensorData();
+
+        // 雷达图参数（放在全局作用域）
+        const radarConfig = {
+            cWidth: 256,        // 画布宽度
+            cHeight: 256,       // 画布高度
+            blob: 20,           // 扇形数量
+            speed: 0.02,        // 扫描速度
+            angle: Math.PI / 4, // 扫描角度范围
+            scanBegin: 0        // 扫描起始角度
+        };
+
+        // 创建雷达画布
+        const radarCanvas = document.createElement('canvas');
+        radarCanvas.width = radarConfig.cWidth;
+        radarCanvas.height = radarConfig.cHeight;
+
+        // 雷达绘制函数
+        function drawRadar() {
+            const ctx = radarCanvas.getContext('2d');
+            const centerX = radarConfig.cWidth / 2;
+            const centerY = radarConfig.cHeight / 2;
+            const radius = radarConfig.cWidth / 2;
+            
+            ctx.clearRect(0, 0, radarConfig.cWidth, radarConfig.cHeight);
+            
+            // 绘制背景圆
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fill();
+            
+            let sAngle = radarConfig.scanBegin;
+            let eAngle = sAngle + radarConfig.angle;
+            let increase;
+            
+            if (sAngle < eAngle) {
+                increase = (eAngle - sAngle) / radarConfig.blob;
+            } else if (sAngle > eAngle) {
+                increase = (Math.PI * 2 - sAngle + eAngle) / radarConfig.blob;
+            } else {
+                return;
+            }
+            
+            let angle1 = sAngle;
+            let angle2 = sAngle + increase;
+            
+            for (let i = 0; i < radarConfig.blob; i++) {
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, angle1, angle2);
+                ctx.fillStyle = `rgba(255,101,116,${i / radarConfig.blob * 0.8})`;
+                ctx.fill();
+                
+                angle1 = angle2;
+                angle2 = angle1 + increase;
+                
+                if (angle2 >= Math.PI * 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, angle1, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255,101,100,${i / radarConfig.blob * 0.8})`;
+                    ctx.fill();
+                    angle1 = 0;
+                    angle2 = angle1 + increase;
+                }
+            }
+            
+            // 更新扫描角度
+            radarConfig.scanBegin += radarConfig.speed;
+            
+            // 超过阈值变为初始值
+            if (radarConfig.scanBegin >= Math.PI * 2) {
+                radarConfig.scanBegin = 0;
+            }
+        }
+
+        // 初始化百度地图
+        function initMap() {
+            var map = new BMapGL.Map("baidu-map");    // 创建Map实例
+            // 台山1号位置
+            map.centerAndZoom(new BMapGL.Point(112.84851, 21.65049), 12);  // 初始化地图
+            map.enableScrollWheelZoom(true); 
+            map.setMapType(BMAP_SATELLITE_MAP);      // 设置地图类型为卫星地图模式
+            
+            // 添加标记点
+            var point = new BMapGL.Point(112.84851, 21.65049);
+            var marker = new BMapGL.Marker(point);
+            map.addOverlay(marker);
+            
+            // 添加信息窗口
+            var infoWindow = new BMapGL.InfoWindow("台山1号监测点");
+            marker.addEventListener("click", function(){          
+                map.openInfoWindow(infoWindow, point);
+            });
+            
+            // 添加雷达覆盖物
+            function addRadarOverlay() {
+                // 定义雷达覆盖区域（以监测点为中心，约1公里范围）
+                const radarSize = 0.01; // 调整这个值可以改变雷达覆盖范围大小
+                var pStart = new BMapGL.Point(
+                    point.lng - radarSize, 
+                    point.lat - radarSize
+                );
+                var pEnd = new BMapGL.Point(
+                    point.lng + radarSize, 
+                    point.lat + radarSize
+                );
+                
+                var bounds = new BMapGL.Bounds(pStart, pEnd);
+                
+                // 创建覆盖物
+                var radarOverlay = new BMapGL.GroundOverlay(bounds, {
+                    type: 'canvas',
+                    url: radarCanvas,
+                    opacity: 0.7,
+                    isReDraw: true,
+                    drawHook: drawRadar
+                });
+                
+                // 初始绘制
+                drawRadar();
+                
+                // 添加到地图
+                map.addOverlay(radarOverlay);
+            }
+            
+            // 添加雷达
+            addRadarOverlay();
+            
+            // 添加定时器使雷达持续动画
+            setInterval(drawRadar, 50);
+        }
+
+        // 页面加载完成后初始化地图
+        window.onload = function() {
+            initMap();
+        };
+    </script>
+</body>
+</html>
